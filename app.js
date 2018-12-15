@@ -2,10 +2,12 @@ const express = require('express');
 const bodyPaser = require('body-parser');
 const graphqlHttp = require('express-graphql');
 const { buildSchema } = require('graphql');
+const mongoose = require('mongoose');
+const Event = require('./models/event')
 
 const app = express();
 
-const events = [];
+// const events = [];
 app.use(bodyPaser.json());
 
 // app.get('/',(req,res,next)=>{
@@ -43,23 +45,53 @@ app.use('/graphql', graphqlHttp({
         }
         `),
         rootValue: {
-            events: ()=> {
-                return events;
-            },
+            events: () => {
+                return Event.find()
+                  .then(events => {
+                    return events.map(event => {
+                      return { ...event._doc, _id: event.id };
+                    });
+                  })
+                  .catch(err => {
+                    throw err;
+                  });
+              },
             createEvent: (arg)=>{
-                const event = {
-                    _id: Math.random().toString(),
+                // const event = {
+                //     _id: Math.random().toString(),
+                //     title: arg.eventInput.title,
+                //     description: arg.eventInput.description,
+                //     price: +arg.eventInput.price,
+                //     date: arg.eventInput.date
+                // }
+                const event = new Event({
                     title: arg.eventInput.title,
                     description: arg.eventInput.description,
                     price: +arg.eventInput.price,
-                    date: arg.eventInput.date
-                }
-                events.push(event);
-                return event;
+                    date: new Date(arg.eventInput.date)
+                });
+                // events.push(event);
+               return event.save().then(result=>{
+                    console.log(result);
+                    return { ...result._doc, _id: result._doc._id.toString() };
+                }).catch(err=> {
+                    console.log(err);
+                    throw err;
+                })
+                // return event;
             }
         },
         graphiql: true
     })
-)
+);
+
+mongoose.connect(`mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0-nqozd.gcp.mongodb.net/${process.env.MONGO_DB}?retryWrites=true`).then(
+    res=> {
+        console.log('Connected sussessfully!');
+    }
+).catch(
+    err=> {
+        console.log(err);
+    });
 
 app.listen(3000);
